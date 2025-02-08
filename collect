@@ -1,0 +1,62 @@
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local rootPart = character:WaitForChild("HumanoidRootPart")
+
+-- 📌 Координаты еды и кормушки
+local FOOD_POSITION = Vector3.new(154, 210, 2067)
+local MAIN_POSITION = Vector3.new(158, 230, 2021)
+
+-- 📌 Функция телепортации
+local function teleportTo(position)
+    rootPart.CFrame = CFrame.new(position)
+end
+
+-- 📌 Функция взаимодействия с ProximityPrompt
+local function interactWithPrompt(prompt)
+    if prompt then
+        fireproximityprompt(prompt)
+        task.wait(prompt.HoldDuration or 1)
+    end
+end
+
+-- 📌 Функция поиска ближайшей еды
+local function findClosestFood()
+    local closestFood = nil
+    local closestPrompt = nil
+    local closestDistance = math.huge
+
+    for _, food in pairs(workspace.Map.House.Items.CatFoods:GetChildren()) do
+        local foodPart = food:FindFirstChild("CatFood")
+        if foodPart and foodPart:FindFirstChild("ProximityPrompt") then
+            local distance = (foodPart.Position - rootPart.Position).magnitude
+            if distance < closestDistance then
+                closestFood = foodPart
+                closestPrompt = foodPart:FindFirstChild("ProximityPrompt")
+                closestDistance = distance
+            end
+        end
+    end
+    return closestFood, closestPrompt
+end
+
+-- 📌 Поиск и подбор еды
+local food, prompt = findClosestFood()
+if food and prompt then
+    teleportTo(food.Position)
+    interactWithPrompt(prompt)
+    task.wait(0.5)
+
+    -- 📌 Перемещение к кормушке
+    teleportTo(FOOD_POSITION)
+    local kitchenPlate = workspace.Map.House.Kitchen.CatBowls.Plate.Attachment.ProximityPrompt
+    interactWithPrompt(kitchenPlate)
+
+    task.wait(1)
+    game:GetService("ReplicatedStorage").FoodDropEvent:FireServer()
+    task.wait(1)
+    interactWithPrompt(kitchenPlate)
+end
+
+-- 📌 Возвращение на место
+teleportTo(MAIN_POSITION)
