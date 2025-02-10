@@ -75,7 +75,7 @@ local function collectAndDeliverFood()
         end
 
         -- Ждём, пока голод уменьшится
-        while stats.Hunger.Value < 40 do
+        while stats.Hunger.Value < 88 do
             task.wait(0.5)
         end
     end
