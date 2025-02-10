@@ -1,18 +1,19 @@
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local rootPart = character:WaitForChild("HumanoidRootPart")
 
--- 📌 Координаты еды и кормушки
-local FOOD_POSITION = Vector3.new(154, 210, 2067)
-local MAIN_POSITION = Vector3.new(158, 230, 2021)
+local FOOD_POSITION = Vector3.new(154, 210, 2067) -- Миска
+local START_POSITION = Vector3.new(100, 200, 100) -- Главная позиция
+local kitchenPlate = workspace.Map.House.Kitchen.CatBowls.Plate.Attachment.ProximityPrompt
 
--- 📌 Функция телепортации
+-- Функция телепортации
 local function teleportTo(position)
     rootPart.CFrame = CFrame.new(position)
 end
 
--- 📌 Функция взаимодействия с ProximityPrompt
+-- Функция взаимодействия с ProximityPrompt
 local function interactWithPrompt(prompt)
     if prompt then
         fireproximityprompt(prompt)
@@ -20,10 +21,9 @@ local function interactWithPrompt(prompt)
     end
 end
 
--- 📌 Функция поиска ближайшей еды
-local function findClosestFood()
-    local closestFood = nil
-    local closestPrompt = nil
+-- Функция поиска еды
+local function findClosestFoodAndPrompt()
+    local closestFood, closestPrompt
     local closestDistance = math.huge
 
     for _, food in pairs(workspace.Map.House.Items.CatFoods:GetChildren()) do
@@ -37,26 +37,51 @@ local function findClosestFood()
             end
         end
     end
+
     return closestFood, closestPrompt
 end
 
--- 📌 Поиск и подбор еды
-local food, prompt = findClosestFood()
-if food and prompt then
-    teleportTo(food.Position)
-    interactWithPrompt(prompt)
-    task.wait(0.5)
+-- Основной цикл добычи еды
+local function collectAndDeliverFood()
+    local stats = player:FindFirstChild("InfoPlayer").Stats
 
-    -- 📌 Перемещение к кормушке
-    teleportTo(FOOD_POSITION)
-    local kitchenPlate = workspace.Map.House.Kitchen.CatBowls.Plate.Attachment.ProximityPrompt
-    interactWithPrompt(kitchenPlate)
+    while stats.Hunger.Value < 88 do
+        local holdingState = player.InfoPlayer.States:FindFirstChild("Holding")
 
-    task.wait(1)
-    game:GetService("ReplicatedStorage").FoodDropEvent:FireServer()
-    task.wait(1)
-    interactWithPrompt(kitchenPlate)
+        if holdingState and holdingState.Value then
+            -- Если уже держим еду, не ищем новую
+            teleportTo(FOOD_POSITION)
+            interactWithPrompt(kitchenPlate)
+            task.wait(1)
+            ReplicatedStorage.FoodDropEvent:FireServer()
+            task.wait(1)
+            interactWithPrompt(kitchenPlate)
+        else
+            -- Берём новую еду
+            local food, prompt = findClosestFoodAndPrompt()
+            if food and prompt then
+                teleportTo(food.Position)
+                interactWithPrompt(prompt)
+                task.wait(0.5)
+
+                -- Несём к миске
+                teleportTo(FOOD_POSITION)
+                interactWithPrompt(kitchenPlate)
+                task.wait(1)
+                ReplicatedStorage.FoodDropEvent:FireServer()
+                task.wait(1)
+                interactWithPrompt(kitchenPlate)
+            end
+        end
+
+        -- Ждём, пока голод уменьшится
+        while stats.Hunger.Value < 40 do
+            task.wait(0.5)
+        end
+    end
+
+    -- После завершения цикла возвращаем игрока обратно
+    teleportTo(START_POSITION)
 end
 
--- 📌 Возвращение на место
-teleportTo(MAIN_POSITION)
+collectAndDeliverFood()
